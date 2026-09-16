@@ -1,5 +1,5 @@
 /* ==========================================================================
-   WASTETRACE SYSTEM CONTROLLER & TELEMETRY LOGIC (DUAL-DISPATCH FIX)
+   WASTETRACE SYSTEM CONTROLLER & TELEMETRY LOGIC (COMPLETE & STABLE)
    ========================================================================== */
 const CONFIG = {
     ADMIN_EMAIL: "mitsukigab012@gmail.com",
@@ -345,7 +345,7 @@ async function handleFormSubmit(event) {
         renderAdminTable();
         renderEmailCards();
 
-        // 🚀 INSTANT FRONTEND NTFY PUSH (Guaranteed to fire just like 4:25 AM test!)
+        // Instant Frontend ntfy push
         sendNtfyNotification(
             `[NEW REPORT] ${incident.id}`,
             `Location: ${incident.location}\nCategory: ${incident.category}\nReporter: ${incident.reporter}\nNotes: ${incident.description}`,
@@ -385,4 +385,370 @@ async function handleFormSubmit(event) {
         console.error("Form Submit Error:", e);
     }
 }
-// [Rest of standard helper functions remain unchanged...]
+
+function openBinModal(binId) {
+    activeModalBinId = binId;
+    const b = binsState[binId];
+    const meta = BIN_DETAILS[binId];
+    if (!b || !meta) return;
+
+    const fill = b.fill;
+    const distance = Math.round(meta.maxDepthCm * (1 - fill / 100));
+
+    document.getElementById("modal-bin-id").innerText = binId;
+    document.getElementById("modal-bin-name").innerText = meta.name;
+    document.getElementById("modal-fill-pct").innerText = `${fill}%`;
+    document.getElementById("modal-ultrasonic").innerText = `${distance} cm`;
+    document.getElementById("modal-category").innerText = meta.category;
+
+    const modal = document.getElementById("bin-modal");
+    if (modal) modal.classList.remove("hidden");
+}
+
+function closeBinModal() {
+    const modal = document.getElementById("bin-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function dispatchJanitorFromModal() {
+    if (activeModalBinId && BIN_DETAILS[activeModalBinId]) {
+        dispatchJanitorCrew(BIN_DETAILS[activeModalBinId].name);
+        closeBinModal();
+    }
+}
+
+function dispatchJanitorCrew(targetName) {
+    sendNtfyNotification(
+        "[DISPATCH] Janitorial Crew Deployed",
+        `Cleaning crew dispatched to clear ${targetName}.`,
+        "high",
+        "truck,broom"
+    );
+    showToast(`🧹 Janitor Crew Dispatched for ${targetName}!`);
+}
+
+function openProofModal(ticketId) {
+    if (!isAdminAuthenticated) { openAdminLoginModal(); return; }
+    activeProofTicketId = ticketId;
+    tempPhotoBase64 = null;
+    document.getElementById("proof-ticket-id").innerText = ticketId;
+    clearPhotoSelection(['modal-proof-camera-input', 'modal-proof-gallery-input'], 'modal-proof-preview', 'modal-preview-box');
+
+    const modal = document.getElementById("proof-upload-modal");
+    if (modal) modal.classList.remove("hidden");
+}
+
+function closeProofModal() {
+    const modal = document.getElementById("proof-upload-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function saveProofAndResolve() {
+    if (activeProofTicketId) {
+        const item = incidentDB.find(i => i.id === activeProofTicketId);
+        if (item) {
+            if (tempPhotoBase64) item.photo = tempPhotoBase64;
+            item.status = "Resolved";
+            saveLocalStorage();
+            renderAdminTable();
+            renderEmailCards();
+            showToast(`✅ Proof uploaded & ${activeProofTicketId} resolved!`);
+
+            sendGASEmail({
+                action: "update_status",
+                report_id: item.id,
+                timestamp: item.timestamp,
+                location: item.location,
+                issue_type: item.category,
+                description: item.description,
+                reporter_info: item.reporter,
+                reporter_email: getReporterEmail(item),
+                status: "Resolved",
+                photo_url: item.photo && item.photo.startsWith("http") ? item.photo : "",
+                image_attachment: tempPhotoBase64 || ""
+            });
+        }
+    }
+    closeProofModal();
+}
+
+function openAdminLoginModal() {
+    document.getElementById("login-error-msg").classList.add("hidden");
+    document.getElementById("admin-login-modal").classList.remove("hidden");
+}
+
+function closeAdminLoginModal() {
+    document.getElementById("admin-login-modal").classList.add("hidden");
+}
+
+function handleAdminLogin(event) {
+    if (event) event.preventDefault();
+    const emailInput = document.getElementById("admin-email-input");
+    const passInput = document.getElementById("admin-password-input");
+
+    if (emailInput.value.trim() === CONFIG.ADMIN_EMAIL && passInput.value.trim() === CONFIG.ADMIN_PASS) {
+        isAdminAuthenticated = true;
+        sessionStorage.setItem(CONFIG.AUTH_KEY, "true");
+        closeAdminLoginModal();
+        showToast("🔓 Welcome, System Admin!");
+        switchView("admin");
+    } else {
+        document.getElementById("login-error-msg").classList.remove("hidden");
+    }
+}
+
+function handleAdminLogout() {
+    isAdminAuthenticated = false;
+    sessionStorage.removeItem(CONFIG.AUTH_KEY);
+    showToast("🚪 Admin Logged Out");
+    switchView("report");
+}
+
+function triggerTestPush() {
+    showToast("⏳ Dispatched Test Notification...");
+    sendNtfyNotification("[TEST] WASTETRACE Telemetry System Check", "Manual Test Alert triggered from Admin Console.", "high", "white_check_mark,bell");
+}
+
+function resetSystemTelemetry() {
+    updateBinFill("BIN-01", 45);
+    updateBinFill("BIN-02", 30);
+    updateBinFill("BIN-03", 20);
+    updateBinFill("BIN-04", 15);
+    showToast("🔄 Telemetry reset to baseline.");
+}
+
+function lookupIncidentStatus() {
+    const query = document.getElementById("lookup-id-input").value.trim().toUpperCase();
+    const item = incidentDB.find(i => i.id.toUpperCase() === query);
+    const box = document.getElementById("tracker-result");
+
+    if (!item) {
+        showToast("❌ Ticket ID not found.");
+        if (box) box.classList.add("hidden");
+        return;
+    }
+
+    document.getElementById("track-id").innerText = item.id;
+    document.getElementById("track-location").innerText = item.location;
+    document.getElementById("track-category").innerText = item.category;
+    document.getElementById("track-reporter").innerText = item.reporter;
+    document.getElementById("track-timestamp").innerText = item.timestamp;
+    document.getElementById("track-notes").innerText = item.description;
+
+    const statusPill = document.getElementById("track-status-pill");
+    if (statusPill) {
+        statusPill.innerText = item.status.toUpperCase();
+        statusPill.className = `pill-badge ${item.status === "Resolved" ? "pill-low" : "pill-mod"}`;
+    }
+
+    const photoBox = document.getElementById("track-photo-box");
+    const photoImg = document.getElementById("track-photo-img");
+    if (item.photo && photoBox && photoImg) {
+        photoImg.src = item.photo;
+        photoBox.classList.remove("hidden");
+    } else if (photoBox) {
+        photoBox.classList.add("hidden");
+    }
+
+    const s1 = document.getElementById("step-1");
+    const s2 = document.getElementById("step-2");
+    const s3 = document.getElementById("step-3");
+    const s4 = document.getElementById("step-4");
+    [s1, s2, s3, s4].forEach(s => s.classList.remove("done"));
+
+    if (item.status === "Submitted") { s1.classList.add("done"); }
+    else if (item.status === "Under Review") { s1.classList.add("done"); s2.classList.add("done"); }
+    else if (item.status === "Maintenance Dispatched") { s1.classList.add("done"); s2.classList.add("done"); s3.classList.add("done"); }
+    else if (item.status === "Resolved") { s1.classList.add("done"); s2.classList.add("done"); s3.classList.add("done"); s4.classList.add("done"); }
+
+    box.classList.remove("hidden");
+}
+
+function setMapFilter(filterType, btnElem) {
+    currentFilter = filterType;
+    document.querySelectorAll(".filter-chip").forEach(c => c.classList.remove("active"));
+    if (btnElem) btnElem.classList.add("active");
+    filterMapPins();
+}
+
+function filterMapPins() {
+    const query = document.getElementById("map-search-input").value.toLowerCase();
+    Object.keys(binsState).forEach(binId => {
+        const fill = binsState[binId].fill;
+        const name = BIN_DETAILS[binId].name.toLowerCase();
+        const pinElem = document.getElementById(`map-pin-${binId}`);
+
+        let matchesFilter = true;
+        if (currentFilter === "low" && fill >= 50) matchesFilter = false;
+        if (currentFilter === "mod" && (fill < 50 || fill >= 80)) matchesFilter = false;
+        if (currentFilter === "crit" && fill < 80) matchesFilter = false;
+
+        let matchesSearch = name.includes(query) || binId.toLowerCase().includes(query);
+
+        if (pinElem) {
+            pinElem.style.display = (matchesFilter && matchesSearch) ? "block" : "none";
+        }
+    });
+}
+
+function renderEmailCards() {
+    const container = document.getElementById("email-ticket-cards-container");
+    if (!container) return;
+    container.innerHTML = "";
+
+    if (incidentDB.length === 0) {
+        container.innerHTML = `<p style="color:var(--text-secondary); font-size:0.85rem;">No active ticket cards logged.</p>`;
+        return;
+    }
+
+    incidentDB.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "email-ticket-card";
+        const badgeClass = item.status === "Resolved" ? "pill-low" : "pill-mod";
+
+        card.innerHTML = `
+            <div class="card-head">
+                <span class="card-ref">${item.id}</span>
+                <span class="pill-badge ${badgeClass}">${item.status.toUpperCase()}</span>
+            </div>
+            <div class="card-body">
+                <p><strong>Location:</strong> ${item.location}</p>
+                <p><strong>Category:</strong> ${item.category}</p>
+                <p><strong>Reporter:</strong> ${item.reporter}</p>
+                <p><strong>Timestamp:</strong> ${item.timestamp}</p>
+                <p><strong>Notes:</strong> ${item.description}</p>
+                ${item.photo ? `<div style="margin-top:6px;"><span class="preview-label">📸 Attached Proof:</span><img src="${item.photo}" class="photo-preview-thumb" alt="Proof Preview"></div>` : ''}
+            </div>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+                <button class="action-btn secondary-btn" style="flex:1; min-height:34px; font-size:0.75rem;" onclick="openProofModal('${item.id}')">📸 Upload Proof</button>
+                <button class="action-btn primary-btn" style="flex:1; min-height:34px; font-size:0.75rem;" onclick="updateStatus('${item.id}', 'Resolved')">✅ Resolve</button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function renderAdminTable() {
+    const tbody = document.getElementById("admin-table-body");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    if (incidentDB.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:1.5rem; color:var(--text-secondary);">No reports logged.</td></tr>`;
+    } else {
+        incidentDB.forEach(item => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td style="font-family:monospace; font-weight:bold; color:var(--accent-blue);">${item.id}</td>
+                <td>${item.timestamp}</td>
+                <td>${item.location}</td>
+                <td>${item.category}</td>
+                <td>${item.reporter}</td>
+                <td>
+                    <select class="form-control" style="min-height:34px; padding:4px 8px; font-size:0.75rem;" onchange="updateStatus('${item.id}', this.value)">
+                        <option value="Submitted" ${item.status === "Submitted" ? "selected" : ""}>1. Submitted</option>
+                        <option value="Under Review" ${item.status === "Under Review" ? "selected" : ""}>2. Under Review</option>
+                        <option value="Maintenance Dispatched" ${item.status === "Maintenance Dispatched" ? "selected" : ""}>3. Dispatched</option>
+                        <option value="Resolved" ${item.status === "Resolved" ? "selected" : ""}>4. Resolved</option>
+                    </select>
+                </td>
+                <td>
+                    <button class="action-btn danger-btn" style="min-height:32px; padding:4px 8px;" onclick="deleteIncident('${item.id}')">✕</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    document.getElementById("kpi-total").innerText = incidentDB.length;
+    document.getElementById("kpi-critical").innerText = incidentDB.filter(i => i.category.includes("Critical Overflow")).length;
+    document.getElementById("kpi-pending").innerText = incidentDB.filter(i => i.status !== "Resolved").length;
+    document.getElementById("kpi-resolved").innerText = incidentDB.filter(i => i.status === "Resolved").length;
+}
+
+function updateStatus(id, newStatus) {
+    if (!isAdminAuthenticated) { openAdminLoginModal(); return; }
+    const item = incidentDB.find(i => i.id === id);
+    if (item) {
+        item.status = newStatus;
+        saveLocalStorage();
+        renderAdminTable();
+        renderEmailCards();
+        showToast(`Updated ${id} to ${newStatus}`);
+
+        sendGASEmail({
+            action: "update_status",
+            report_id: item.id,
+            timestamp: item.timestamp,
+            location: item.location,
+            issue_type: item.category,
+            description: item.description,
+            reporter_info: item.reporter,
+            reporter_email: getReporterEmail(item),
+            status: item.status,
+            photo_url: item.photo && item.photo.startsWith("http") ? item.photo : "",
+            image_attachment: item.photo && item.photo.startsWith("data:image") ? item.photo : ""
+        });
+    }
+}
+
+function deleteIncident(id) {
+    if (!isAdminAuthenticated) { openAdminLoginModal(); return; }
+    if (confirm(`Delete ticket ${id}?`)) {
+        incidentDB = incidentDB.filter(i => i.id !== id);
+        saveLocalStorage();
+        renderAdminTable();
+        renderEmailCards();
+        showToast(`Deleted ${id}`);
+
+        sendGASEmail({
+            action: "delete_report",
+            report_id: id
+        });
+    }
+}
+
+function exportToCSV() {
+    if (!isAdminAuthenticated) { openAdminLoginModal(); return; }
+    if (incidentDB.length === 0) { showToast("⚠️ No logs to export."); return; }
+    let csv = "data:text/csv;charset=utf-8,Ticket ID,Timestamp,Location,Category,Reporter,Status\n";
+    incidentDB.forEach(item => {
+        csv += `"${item.id}","${item.timestamp}","${item.location}","${item.category}","${item.reporter}","${item.status}"\n`;
+    });
+    const link = document.createElement("a");
+    link.href = encodeURI(csv);
+    link.download = `WASTETRACE_Logs_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function handleLocationChange() {
+    const select = document.getElementById("campus-location");
+    const customInput = document.getElementById("custom-location-input");
+    if (select && customInput) {
+        customInput.classList.toggle("hidden", select.value !== "Custom");
+        customInput.required = (select.value === "Custom");
+    }
+}
+
+function saveLocalStorage() {
+    try { localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(incidentDB)); } catch (e) {}
+}
+
+function loadLocalStorage() {
+    try {
+        const data = localStorage.getItem(CONFIG.STORAGE_KEY);
+        if (data) incidentDB = JSON.parse(data);
+    } catch (e) {}
+}
+
+function showToast(msg) {
+    const toast = document.getElementById("toast-notification");
+    const msgElem = document.getElementById("toast-message");
+    if (toast && msgElem) {
+        msgElem.innerText = msg;
+        toast.classList.remove("hidden");
+        setTimeout(() => toast.classList.add("hidden"), 3500);
+    }
+}
