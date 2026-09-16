@@ -1,5 +1,5 @@
 /* ==========================================================================
-   WASTETRACE SYSTEM CONTROLLER & TELEMETRY LOGIC
+   WASTETRACE SYSTEM CONTROLLER & TELEMETRY LOGIC (REVISED)
    ========================================================================== */
 const CONFIG = {
     ADMIN_EMAIL: "mitsukigab012@gmail.com",
@@ -259,34 +259,38 @@ async function sendNtfyNotification(title, message, priority = "high", tags = "w
         const cleanTitle = String(title).replace(/[^\x00-\x7F]/g, "").trim();
         const cleanMessage = String(message).replace(/[^\x00-\x7F]/g, "").trim();
 
-        const headers = {
-            "Title": cleanTitle || "WASTETRACE Alert",
-            "Priority": priority || "high",
-            "Tags": tags || "warning"
+        const topicName = CONFIG.NTFY_TOPIC.split("/").pop();
+        const payloadObj = {
+            topic: topicName,
+            message: cleanMessage,
+            title: cleanTitle,
+            priority: priority,
+            tags: tags.split(",")
         };
 
         if (photoUrl && typeof photoUrl === "string" && photoUrl.startsWith("http")) {
-            headers["Attach"] = photoUrl;
-            headers["Click"] = photoUrl;
-            headers["Actions"] = `view, View Attachment, ${photoUrl}`;
+            payloadObj.click = photoUrl;
         }
 
-        await fetch(CONFIG.NTFY_TOPIC, {
+        await fetch("https://ntfy.sh", {
             method: "POST",
             mode: "cors",
-            headers: headers,
-            body: cleanMessage
-        }).catch(err => console.warn("ntfy fetch caught:", err));
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payloadObj)
+        }).catch(err => console.warn("ntfy direct fetch warning:", err));
     } catch (err) {
         console.error("ntfy dispatch error:", err);
     }
 }
 
+// Improved Robust POST Dispatcher with Console Logging
 async function sendGASEmail(payload) {
     try {
         isSyncPaused = true;
+        console.log("🚀 Dispatches to GAS initiated for action:", payload.action);
 
-        if (payload.image_attachment && payload.image_attachment.length > 2500000) {
+        if (payload.image_attachment && payload.image_attachment.length > 2000000) {
+            console.warn("Image too large, stripping base64 to prevent payload drop.");
             payload.image_attachment = null;
         }
 
@@ -295,15 +299,17 @@ async function sendGASEmail(payload) {
             mode: "no-cors",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify(payload)
-        }).catch(err => console.warn("GAS Endpoint warning:", err));
+        });
+
+        console.log("✅ GAS POST request sent successfully.");
 
         setTimeout(() => {
             isSyncPaused = false;
             syncCloudDatabase();
-        }, 3000);
+        }, 3500);
     } catch (err) {
         isSyncPaused = false;
-        console.error("GAS sync error caught safely:", err);
+        console.error("❌ GAS sync network error:", err);
     }
 }
 
@@ -346,6 +352,7 @@ async function handleFormSubmit(event) {
         renderAdminTable();
         renderEmailCards();
 
+        // Fire GAS endpoint POST
         sendGASEmail({
             action: "create_report",
             report_id: incident.id,
