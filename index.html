@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0f17">
+    <title>WASTETRACE - QCU Smart Campus Telemetry Portal</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-wrapper">
+        <!-- Header Navbar -->
+        <header class="app-header">
+            <div class="brand-title">
+                <div class="qcu-brand-logo-wrap">
+                    <svg class="qcu-brand-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="46" fill="#0f172a" stroke="#eab308" stroke-width="4"/>
+                        <path d="M 20 50 A 30 30 0 0 1 80 50 Z" fill="#003399"/>
+                        <path d="M 20 50 A 30 30 0 0 0 80 50 Z" fill="#cc0000"/>
+                        <rect x="47" y="25" width="6" height="40" fill="#ffffff"/>
+                        <rect x="42" y="30" width="16" height="4" fill="#ffffff"/>
+                        <ellipse cx="50" cy="45" rx="28" ry="10" fill="none" stroke="#eab308" stroke-width="2.5" transform="rotate(-20 50 45)"/>
+                        <path d="M 25 70 Q 50 55 75 70" fill="none" stroke="#eab308" stroke-width="4" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div>
+                    <span class="brand-name">WASTETRACE</span>
+                    <span class="brand-sub">Quezon City University Facilities Telemetry</span>
+                </div>
+            </div>
+
+            <div class="view-switcher">
+                <button id="btn-report-view" class="switch-btn active" onclick="switchView('report')">
+                    📝 Report & Track
+                </button>
+                <button id="btn-map-view" class="switch-btn" onclick="switchView('map')">
+                    📍 QCU Campus Map
+                </button>
+                <button id="btn-admin-view" class="switch-btn" onclick="switchView('admin')">
+                    ⚙️ Admin Console
+                </button>
+            </div>
+        </header>
+
+        <!-- 1. Public Incident Report & Tracking View -->
+        <main id="report-view" class="view-panel active">
+            <div class="card form-card">
+                <div class="ticket-id-banner">
+                    <div>
+                        <span class="banner-label"># INCIDENT TRACKING ID</span>
+                        <div id="live-incident-id" class="banner-id">WT-2026-6316</div>
+                    </div>
+                    <div class="live-clock-box">
+                        <span id="live-clock" class="clock-text">--:--:-- PM</span>
+                        <span class="status-pulse">
+                            <span class="pulse-dot"></span> LORA FEED ACTIVE
+                        </span>
+                    </div>
+                </div>
+
+                <form id="incident-form" onsubmit="handleFormSubmit(event)">
+                    <!-- Location Selector -->
+                    <div class="form-group">
+                        <label for="campus-location" class="form-label">
+                            📍 Campus Bin Location <span class="required">*</span>
+                        </label>
+                        <select id="campus-location" class="form-control" required onchange="handleLocationChange()">
+                            <option value="" disabled selected>Select QCU Facility Location</option>
+                            <option value="TechVoc Building (Main Entrance / Bin #01)">TechVoc Building (Main Entrance / Bin #01)</option>
+                            <option value="Concert Grounds (Stage Front / Bin #02)">Concert Grounds (Stage Front / Bin #02)</option>
+                            <option value="Admin Building (Lobby Entrance / Bin #03)">Admin Building (Lobby Entrance / Bin #03)</option>
+                            <option value="Belmonte Building (East Wing / Bin #04)">Belmonte Building (East Wing / Bin #04)</option>
+                            <option value="Custom">Custom / Other QCU Location</option>
+                        </select>
+                        <input type="text" id="custom-location-input" class="form-control mt-2 hidden" placeholder="Specify custom location details...">
+                    </div>
+
+                    <!-- Issue Category Selection Grid -->
+                    <div class="form-group">
+                        <label class="form-label">🏷️ Issue Category Tag <span class="required">*</span></label>
+                        <input type="hidden" id="selected-category" required value="Critical Overflow">
+                        <div class="category-grid">
+                            <button type="button" class="category-tag-btn active" onclick="selectCategoryTag('Critical Overflow', this)">
+                                🛑 Critical Overflow
+                            </button>
+                            <button type="button" class="category-tag-btn" onclick="selectCategoryTag('Sensor Defect', this)">
+                                🧠 Sensor Defect
+                            </button>
+                            <button type="button" class="category-tag-btn" onclick="selectCategoryTag('Foul Odor', this)">
+                                💨 Foul Odor
+                            </button>
+                            <button type="button" class="category-tag-btn" onclick="selectCategoryTag('Spill Hazard', this)">
+                                ☣️ Spill Hazard
+                            </button>
+                            <button type="button" class="category-tag-btn" onclick="selectCategoryTag('General Litter', this)">
+                                🧹 General Litter
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="form-group">
+                        <label for="issue-description" class="form-label">
+                            📝 Issue Description / Telemetry Notes
+                        </label>
+                        <textarea id="issue-description" class="form-control" rows="3" placeholder="Describe the issue (e.g., bin overflowing onto ground, sensor lid damaged, liquid leak)..."></textarea>
+                    </div>
+
+                    <!-- Photo Evidence Attachment Dual Action Buttons -->
+                    <div class="form-group">
+                        <label class="form-label">📷 Photo Evidence Attachment</label>
+                        
+                        <input type="file" id="report-camera-input" class="hidden" accept="image/*" capture="environment" onchange="handlePhotoSelect(event, 'report-photo-preview', 'report-preview-box')">
+                        <input type="file" id="report-gallery-input" class="hidden" accept="image/*" onchange="handlePhotoSelect(event, 'report-photo-preview', 'report-preview-box')">
+                        
+                        <div class="photo-btn-row">
+                            <button type="button" class="photo-action-btn" onclick="triggerPhotoCapture('report-camera-input')">
+                                📷 Take Photo
+                            </button>
+                            <button type="button" class="photo-action-btn" onclick="triggerPhotoCapture('report-gallery-input')">
+                                🖼 Choose Gallery
+                            </button>
+                        </div>
+
+                        <div id="report-preview-box" class="preview-container hidden">
+                            <span class="preview-label">📸 Photo Evidence Loaded:</span>
+                            <img id="report-photo-preview" class="photo-preview-thumb" alt="Evidence Preview">
+                            <button type="button" class="clear-photo-btn" onclick="clearPhotoSelection(['report-camera-input', 'report-gallery-input'], 'report-photo-preview', 'report-preview-box')">✕ Remove Photo</button>
+                        </div>
+                    </div>
+
+                    <!-- Reporter Contact Card -->
+                    <div class="form-group reporter-card">
+                        <label class="form-label">👤 Reporter Contact Info (Optional)</label>
+                        <div class="grid-2">
+                            <input type="text" id="reporter-name" class="form-control" placeholder="Full Name / Student ID">
+                            <input type="email" id="reporter-email" class="form-control" placeholder="Email Address">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="submit-btn" class="action-btn primary-btn full-width">
+                        🚀 Dispatch Incident Report
+                    </button>
+                </form>
+            </div>
+
+            <!-- Incident Tracker Search -->
+            <div class="card tracking-card">
+                <h3>🔍 Track Incident Resolution Status</h3>
+                <p class="card-subtitle">Enter your reference ticket ID to view real-time janitorial dispatch progress.</p>
+                
+                <div class="filter-toolbar mt-3">
+                    <div class="search-box-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="lookup-id-input" class="form-control search-input" placeholder="e.g. WT-2026-6316">
+                    </div>
+                    <button class="action-btn primary-btn" onclick="lookupIncidentStatus()">Search Ticket</button>
+                </div>
+
+                <div id="tracker-result" class="tracker-stepper-box hidden">
+                    <div class="stepper-header">
+                        <div>
+                            <span class="stepper-sub-label">TICKET REFERENCE</span>
+                            <span id="track-id" class="stepper-ticket-code">WT-2026-0000</span>
+                        </div>
+                        <span id="track-status-pill" class="pill-badge pill-low">RESOLVED</span>
+                    </div>
+
+                    <div class="stepper-pipeline">
+                        <div id="step-1" class="step-item done">
+                            <div class="step-number">1</div>
+                            <span class="step-label">Logged</span>
+                            <span id="step-1-sub" class="step-sub">Done</span>
+                        </div>
+                        <div id="step-2" class="step-item">
+                            <div class="step-number">2</div>
+                            <span class="step-label">Review</span>
+                            <span id="step-2-sub" class="step-sub">Pending</span>
+                        </div>
+                        <div id="step-3" class="step-item">
+                            <div class="step-number">3</div>
+                            <span class="step-label">Dispatched</span>
+                            <span id="step-3-sub" class="step-sub">Pending</span>
+                        </div>
+                        <div id="step-4" class="step-item">
+                            <div class="step-number">4</div>
+                            <span class="step-label">Resolved</span>
+                            <span id="step-4-sub" class="step-sub">Pending</span>
+                        </div>
+                    </div>
+
+                    <div class="stepper-details-card">
+                        <p><span>Location:</span> <strong id="track-location">--</strong></p>
+                        <p><span>Category:</span> <strong id="track-category">--</strong></p>
+                        <p><span>Reporter:</span> <strong id="track-reporter">--</strong></p>
+                        <p><span>Timestamp:</span> <span id="track-timestamp">--</span></p>
+                        <p><span>Notes:</span> <span id="track-notes">--</span></p>
+                        <div id="track-photo-box" class="mt-2 hidden">
+                            <span class="preview-label">Attached Proof Preview:</span>
+                            <img id="track-photo-img" class="photo-preview-thumb" alt="Attachment Proof">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 2. Student QCU Campus Map View -->
+        <main id="map-view" class="view-panel">
+            <div class="card">
+                <!-- Top Nodes Summary Header -->
+                <div class="telemetry-nodes-grid">
+                    <div id="node-card-BIN-01" class="node-card">
+                        <div class="node-head">
+                            <span class="node-title">🗑️ TechVoc Bldg Bin #01</span>
+                            <span id="node-fill-BIN-01" class="node-pct">45%</span>
+                        </div>
+                        <span class="node-sub">Main Entrance • Recyclables</span>
+                        <div class="progress-bar-wrap">
+                            <div id="node-bar-BIN-01" class="progress-bar-fill" style="width: 45%;"></div>
+                        </div>
+                    </div>
+
+                    <div id="node-card-BIN-02" class="node-card">
+                        <div class="node-head">
+                            <span class="node-title">🗑️ Concert Grounds Bin #02</span>
+                            <span id="node-fill-BIN-02" class="node-pct">85%</span>
+                        </div>
+                        <span class="node-sub">Stage Front • General Waste</span>
+                        <div class="progress-bar-wrap">
+                            <div id="node-bar-BIN-02" class="progress-bar-fill" style="width: 85%;"></div>
+                        </div>
+                    </div>
+
+                    <div id="node-card-BIN-03" class="node-card">
+                        <div class="node-head">
+                            <span class="node-title">🗑️ Admin Bldg Bin #03</span>
+                            <span id="node-fill-BIN-03" class="node-pct">30%</span>
+                        </div>
+                        <span class="node-sub">Lobby Entrance • Paper</span>
+                        <div class="progress-bar-wrap">
+                            <div id="node-bar-BIN-03" class="progress-bar-fill" style="width: 30%;"></div>
+                        </div>
+                    </div>
+
+                    <div id="node-card-BIN-04" class="node-card">
+                        <div class="node-head">
+                            <span class="node-title">🗑️ Belmonte Bldg Bin #04</span>
+                            <span id="node-fill-BIN-04" class="node-pct">60%</span>
+                        </div>
+                        <span class="node-sub">East Wing • Organic</span>
+                        <div class="progress-bar-wrap">
+                            <div id="node-bar-BIN-04" class="progress-bar-fill" style="width: 60%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Alert Hub -->
+                    <div class="alert-hub-card">
+                        <div class="hub-icon">🔔</div>
+                        <span class="hub-title">Alert & Dispatch Hub</span>
+                        <span id="alert-overflow-count" class="hub-count red-text">1 OVERFLOW</span>
+                        <span class="hub-sub">Dispatch Required</span>
+                    </div>
+                </div>
+
+                <div class="filter-toolbar mt-3">
+                    <div class="search-box-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="map-search-input" class="form-control search-input" placeholder="Search bin or building..." oninput="filterMapPins()">
+                    </div>
+                    <div class="filter-badges">
+                        <button class="filter-chip active" onclick="setMapFilter('all', this)">All Bins</button>
+                        <button class="filter-chip" onclick="setMapFilter('low', this)">
+                            <span class="status-circle circle-low"></span> Low (&lt;50%)
+                        </button>
+                        <button class="filter-chip" onclick="setMapFilter('mod', this)">
+                            <span class="status-circle circle-mod"></span> Mod (50-79%)
+                        </button>
+                        <button class="filter-chip" onclick="setMapFilter('crit', this)">
+                            <span class="status-circle circle-crit"></span> Full (&gt;=80%)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Clean SVG Map Layout -->
+                <div class="map-wrapper">
+                    <svg class="map-svg" viewBox="0 0 800 650" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="10" y="10" width="780" height="630" rx="16" fill="#0d131f" stroke="#232d3f" stroke-width="2" />
+
+                        <!-- Road Network -->
+                        <path d="M 120 600 L 120 100 Q 120 50 170 50 L 630 50 Q 680 50 680 100 L 680 600" 
+                              fill="none" stroke="#1e293b" stroke-width="60" stroke-linejoin="round" stroke-linecap="round" />
+                        <path d="M 120 600 L 120 100 Q 120 50 170 50 L 630 50 Q 680 50 680 100 L 680 600" 
+                              fill="none" stroke="#e2e8f0" stroke-width="2" stroke-dasharray="12,12" stroke-linejoin="round" />
+
+                        <!-- QCU Central Oval -->
+                        <ellipse cx="400" cy="180" rx="85" ry="45" fill="#064e3b" stroke="#22c55e" stroke-width="2" />
+                        
+                        <g transform="translate(400, 168) scale(0.75)" text-anchor="middle">
+                            <circle cx="0" cy="0" r="22" fill="#0d131f" stroke="#eab308" stroke-width="1.5" />
+                            <rect x="-3" y="-12" width="2" height="20" fill="#38bdf8" />
+                            <rect x="-0.5" y="-15" width="2" height="23" fill="#ffffff" />
+                            <rect x="2" y="-12" width="2" height="20" fill="#ef4444" />
+                            <rect x="-6" y="5" width="12" height="3" fill="#eab308" />
+                            <ellipse cx="0" cy="-3" rx="14" ry="5" fill="none" stroke="#38bdf8" stroke-width="1" transform="rotate(-25)" />
+                            <ellipse cx="0" cy="-3" rx="14" ry="5" fill="none" stroke="#ef4444" stroke-width="1" transform="rotate(25)" />
+                            <path d="M-10,12 L-6,4 L-2,12" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round"/>
+                            <path d="M2,12 L6,4 L10,12" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round"/>
+                        </g>
+                        <text x="400" y="212" fill="#6ee7b7" font-size="10" font-weight="bold" text-anchor="middle">QCU OPEN GROUNDS</text>
+
+                        <!-- Campus Buildings -->
+                        <rect x="280" y="440" width="240" height="90" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
+                        <text x="400" y="480" fill="#38bdf8" font-size="13" font-weight="bold" text-anchor="middle">TECHVOC BUILDING</text>
+
+                        <rect x="100" y="280" width="220" height="90" rx="10" fill="#1e293b" stroke="#ef4444" stroke-width="2" />
+                        <text x="210" y="320" fill="#f87171" font-size="12" font-weight="bold" text-anchor="middle">ADMINISTRATIVE BLDG</text>
+
+                        <rect x="480" y="280" width="220" height="90" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="2" />
+                        <text x="590" y="320" fill="#fbbf24" font-size="12" font-weight="bold" text-anchor="middle">BELMONTE BUILDING</text>
+
+                        <rect x="490" y="100" width="190" height="80" rx="10" fill="#1e293b" stroke="#ec4899" stroke-width="2" />
+                        <text x="585" y="135" fill="#f472b6" font-size="12" font-weight="bold" text-anchor="middle">CONCERT GROUNDS</text>
+
+                        <!-- Interactive Pin Markers -->
+                        <g id="map-pin-BIN-01" class="map-pin" onclick="openBinModal('BIN-01')">
+                            <circle id="pulse-BIN-01" cx="400" cy="510" r="16" fill="#3b82f6" class="pulse-ring" opacity="0.4" />
+                            <circle id="core-BIN-01" cx="400" cy="510" r="12" fill="#3b82f6" stroke="#ffffff" stroke-width="2" />
+                            <text id="label-BIN-01" x="400" y="470" fill="#ffffff" font-size="11" font-weight="bold" text-anchor="middle">Bin #01: 45%</text>
+                        </g>
+
+                        <g id="map-pin-BIN-02" class="map-pin" onclick="openBinModal('BIN-02')">
+                            <circle id="pulse-BIN-02" cx="585" cy="120" r="16" fill="#ef4444" class="pulse-ring" opacity="0.4" />
+                            <circle id="core-BIN-02" cx="585" cy="120" r="12" fill="#ef4444" stroke="#ffffff" stroke-width="2" />
+                            <text id="label-BIN-02" x="585" y="80" fill="#ffffff" font-size="11" font-weight="bold" text-anchor="middle">Bin #02: 85%</text>
+                        </g>
+
+                        <g id="map-pin-BIN-03" class="map-pin" onclick="openBinModal('BIN-03')">
+                            <circle id="pulse-BIN-03" cx="210" cy="350" r="16" fill="#22c55e" class="pulse-ring" opacity="0.4" />
+                            <circle id="core-BIN-03" cx="210" cy="350" r="12" fill="#22c55e" stroke="#ffffff" stroke-width="2" />
+                            <text id="label-BIN-03" x="210" y="310" fill="#ffffff" font-size="11" font-weight="bold" text-anchor="middle">Bin #03: 30%</text>
+                        </g>
+
+                        <g id="map-pin-BIN-04" class="map-pin" onclick="openBinModal('BIN-04')">
+                            <circle id="pulse-BIN-04" cx="590" cy="350" r="16" fill="#eab308" class="pulse-ring" opacity="0.4" />
+                            <circle id="core-BIN-04" cx="590" cy="350" r="12" fill="#eab308" stroke="#ffffff" stroke-width="2" />
+                            <text id="label-BIN-04" x="590" y="310" fill="#ffffff" font-size="11" font-weight="bold" text-anchor="middle">Bin #04: 60%</text>
+                        </g>
+                    </svg>
+                </div>
+
+                <!-- Telemetry Range Sliders -->
+                <div class="card mt-3">
+                    <h3>🎛️ Live Telemetry Control Sliders</h3>
+                    <div class="grid-2 mt-2">
+                        <div class="slider-card">
+                            <div class="slider-header">
+                                <span>TechVoc Bin #01</span>
+                                <strong id="slider-val-BIN-01" style="color:var(--accent-blue);">45%</strong>
+                            </div>
+                            <input type="range" class="slider-input" min="0" max="100" value="45" oninput="updateBinFill('BIN-01', this.value)">
+                        </div>
+
+                        <div class="slider-card">
+                            <div class="slider-header">
+                                <span>Concert Bin #02</span>
+                                <strong id="slider-val-BIN-02" style="color:var(--accent-red);">85%</strong>
+                            </div>
+                            <input type="range" class="slider-input" min="0" max="100" value="85" oninput="updateBinFill('BIN-02', this.value)">
+                        </div>
+
+                        <div class="slider-card">
+                            <div class="slider-header">
+                                <span>Admin Bin #03</span>
+                                <strong id="slider-val-BIN-03" style="color:var(--accent-green);">30%</strong>
+                            </div>
+                            <input type="range" class="slider-input" min="0" max="100" value="30" oninput="updateBinFill('BIN-03', this.value)">
+                        </div>
+
+                        <div class="slider-card">
+                            <div class="slider-header">
+                                <span>Belmonte Bin #04</span>
+                                <strong id="slider-val-BIN-04" style="color:var(--accent-yellow);">60%</strong>
+                            </div>
+                            <input type="range" class="slider-input" min="0" max="100" value="60" oninput="updateBinFill('BIN-04', this.value)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 3. Admin Console View -->
+        <main id="admin-view" class="view-panel">
+            <div class="card admin-header-banner">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div class="qcu-brand-logo-wrap" style="width:36px; height:36px;">
+                        <svg class="qcu-brand-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="50" cy="50" r="46" fill="#0f172a" stroke="#eab308" stroke-width="4"/>
+                            <path d="M 20 50 A 30 30 0 0 1 80 50 Z" fill="#003399"/>
+                            <path d="M 20 50 A 30 30 0 0 0 80 50 Z" fill="#cc0000"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <span class="auth-badge">🔒 AUTHORIZED QCU SESSION</span>
+                        <p class="card-subtitle">Logged in as: <strong style="color:var(--accent-blue);">mitsukigab012@gmail.com</strong></p>
+                    </div>
+                </div>
+                <button class="action-btn secondary-btn" onclick="handleAdminLogout()">🚪 Logout Admin</button>
+            </div>
+
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <span class="kpi-title">📋 TOTAL REPORTS</span>
+                    <span id="kpi-total" class="kpi-value">0</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-title">🔴 CRITICAL OVERFLOWS</span>
+                    <span id="kpi-critical" class="kpi-value red-text">0</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-title">⏳ PENDING ACTION</span>
+                    <span id="kpi-pending" class="kpi-value orange-text">0</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-title">✅ RESOLVED CASES</span>
+                    <span id="kpi-resolved" class="kpi-value green-text">0</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="filter-toolbar mt-1">
+                    <button class="action-btn primary-btn" onclick="triggerTestPush()">🚀 Test Alert & Push Notification</button>
+                    <button class="action-btn warning-btn" onclick="dispatchJanitorCrew('All Critical Bins')">🧹 Auto-Dispatch Janitor Crew</button>
+                    <button class="action-btn secondary-btn" onclick="resetSystemTelemetry()">🔄 Global System Reset</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <h3>📩 Ticket Dispatch & Email Reporting Cards</h3>
+                    <button class="action-btn secondary-btn" onclick="exportToCSV()">📥 Export CSV</button>
+                </div>
+                <div id="email-ticket-cards-container" class="ticket-cards-grid"></div>
+            </div>
+
+            <div class="card">
+                <h3>📑 Incident Telemetry Logs Table</h3>
+                <div class="table-wrapper mt-3">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Incident ID</th>
+                                <th>Timestamp</th>
+                                <th>Location</th>
+                                <th>Category</th>
+                                <th>Reporter Info</th>
+                                <th>Status Action</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Admin Authentication Modal -->
+    <div id="admin-login-modal" class="modal-overlay hidden" onclick="closeAdminLoginModal()">
+        <div class="modal-card admin-login-card" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeAdminLoginModal()">✕</button>
+            <div style="text-align:center; margin-bottom:1.25rem;">
+                <h3>QCU Admin Console Login</h3>
+                <p class="card-subtitle">Enter authorized credentials to access facility controls.</p>
+            </div>
+
+            <form id="admin-login-form" onsubmit="handleAdminLogin(event)">
+                <div class="form-group">
+                    <label for="admin-email-input" class="form-label">Authorized Email <span class="required">*</span></label>
+                    <input type="email" id="admin-email-input" class="form-control" placeholder="mitsukigab012@gmail.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="admin-password-input" class="form-label">Password <span class="required">*</span></label>
+                    <input type="password" id="admin-password-input" class="form-control" placeholder="••••••••••••" required>
+                </div>
+
+                <div id="login-error-msg" class="error-text hidden">⚠️ Invalid Email or Password.</div>
+
+                <button type="submit" class="action-btn primary-btn full-width">
+                    🔓 Authenticate & Access
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Completion Proof Modal -->
+    <div id="proof-upload-modal" class="modal-overlay hidden" onclick="closeProofModal()">
+        <div class="modal-card" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeProofModal()">✕</button>
+            <h3 style="margin-bottom:0.5rem;">📷 Upload Completion / Proof Photo</h3>
+            <p class="card-subtitle" style="margin-bottom:1rem;">Attach camera capture or image proof to resolve ticket <strong id="proof-ticket-id" style="color:var(--accent-blue);">--</strong>.</p>
+
+            <div class="form-group">
+                <label class="form-label">Select Proof Source</label>
+                <input type="file" id="modal-proof-camera-input" class="hidden" accept="image/*" capture="environment" onchange="handlePhotoSelect(event, 'modal-proof-preview', 'modal-preview-box')">
+                <input type="file" id="modal-proof-gallery-input" class="hidden" accept="image/*" onchange="handlePhotoSelect(event, 'modal-proof-preview', 'modal-preview-box')">
+
+                <div class="photo-btn-row">
+                    <button type="button" class="photo-action-btn" onclick="triggerPhotoCapture('modal-proof-camera-input')">
+                        📷 Take Photo
+                    </button>
+                    <button type="button" class="photo-action-btn" onclick="triggerPhotoCapture('modal-proof-gallery-input')">
+                        🖼 Choose Gallery
+                    </button>
+                </div>
+
+                <div id="modal-preview-box" class="preview-container hidden">
+                    <span class="preview-label">📸 Proof Photo Loaded:</span>
+                    <img id="modal-proof-preview" class="photo-preview-thumb" alt="Proof Preview">
+                    <button type="button" class="clear-photo-btn" onclick="clearPhotoSelection(['modal-proof-camera-input', 'modal-proof-gallery-input'], 'modal-proof-preview', 'modal-preview-box')">✕ Remove Photo</button>
+                </div>
+            </div>
+
+            <button class="action-btn primary-btn full-width" onclick="saveProofAndResolve()">
+                ✅ Submit Proof & Mark Resolved
+            </button>
+        </div>
+    </div>
+
+    <!-- Map Bin Dynamic Modal -->
+    <div id="bin-modal" class="modal-overlay hidden" onclick="closeBinModal()">
+        <div class="modal-card" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeBinModal()">✕</button>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                <span id="modal-status-dot" class="status-circle circle-low"></span>
+                <span id="modal-bin-id" style="font-family:monospace; font-weight:bold; color:var(--accent-blue);">BIN-01</span>
+            </div>
+            <h3 id="modal-bin-name" style="margin-bottom:0.75rem;">TechVoc Building (Bin #01)</h3>
+
+            <div class="stepper-details-card" style="margin-bottom:1rem;">
+                <p><span>Fill Level:</span> <strong id="modal-fill-pct" style="color:var(--accent-blue);">45%</strong></p>
+                <p><span>Ultrasonic Depth:</span> <strong id="modal-ultrasonic">55 cm</strong></p>
+                <p><span>Waste Category:</span> <span id="modal-category" style="color:var(--text-secondary);">Recyclables</span></p>
+                <p><span>Status:</span> <span id="modal-status-pill" class="pill-badge pill-low">NORMAL</span></p>
+            </div>
+
+            <button class="action-btn primary-btn full-width" onclick="dispatchJanitorFromModal()">
+                🧹 Dispatch Janitor Crew to Bin
+            </button>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast-notification" class="toast hidden">
+        <span id="toast-message">Notification Message</span>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
